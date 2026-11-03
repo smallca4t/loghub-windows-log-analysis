@@ -57,3 +57,24 @@ A reconciliação foi satisfeita: total de linhas lidas = eventos parseados + li
 ## 7. Próxima etapa
 
 Validar a qualidade dos campos extraídos antes de normalizar ou persistir dados: frequências de level e component, mensagens vazias, intervalo temporal, validade real dos timestamps e ocorrência de linhas idênticas repetidas. Registros repetidos não devem ser removidos sem justificativa baseada no contexto do log.
+
+## 8. Resultado da validação inicial
+
+| Verificação | Resultado |
+| --- | --- |
+| Valores de `level` | `Info`: 2.000 eventos |
+| Valores de `component` | `CBS`: 1.973 (98,65%); `CSI`: 27 (1,35%) |
+| Mensagens vazias | 0 |
+| Timestamps inválidos | 0 |
+| Intervalo temporal | 2016-09-28 04:30:30 até 2016-09-29 02:04:40 |
+| Padrões de linha repetidos | 23 |
+| Eventos envolvidos em repetições | 742 |
+| Repetições além da primeira ocorrência | 719 |
+
+A estrutura extraída é coerente com o padrão observado. A presença da palavra `Warning` em algumas mensagens não altera o valor estruturado de `level`, que é `Info` em todos os registros.
+
+As repetições exatas não serão removidas nesta etapa: podem representar ocorrências legítimas do processo registrado. A deduplicação só poderá ser considerada posteriormente se houver uma pergunta analítica e uma justificativa documentada.
+
+## 9. Próxima etapa revisada
+
+Com a validação concluída, a próxima atividade é definir normalizações necessárias e seguras. O ponto de partida será converter `event_timestamp` de texto para datetime, preservando `raw_line` e os valores originais para rastreabilidade.
