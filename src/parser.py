@@ -99,6 +99,18 @@ if valid_timestamps:
     print(f"Primeiro timestamp: {min(valid_timestamps)}")
     print(f"Último timestamp: {max(valid_timestamps)}")
 
+for event in parsed_events:
+    event["event_timestamp_raw"] = event["event_timestamp"]
+
+    event["event_timestamp"] = datetime.strptime(
+        event["event_timestamp_raw"],
+        timestamp_format
+    )
+
+print(
+    "\nTipo do timestamp normalizado:",
+    type(parsed_events[0]["event_timestamp"]).__name__
+)
 
 raw_line_counts = Counter(
     event["raw_line"]
