@@ -11,6 +11,7 @@ CREATE TABLE log_events (
     component TEXT NOT NULL,
     message TEXT NOT NULL,
     raw_line TEXT NOT NULL,
-    parse_status TEXT NOT NULL
+    parse_status TEXT NOT NULL,
+    CONSTRAINT log_events_source_line_unique UNIQUE (source_file, line_number)
 );
 

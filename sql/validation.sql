@@ -2,6 +2,12 @@
 -- Os valores esperados abaixo valem para o dataset atual de 2.000 eventos.
 -- Execute conectado ao banco loghub_windows_logs após a importação.
 
+-- Pré-requisito da migração 001: esta consulta deve retornar zero linhas.
+SELECT source_file, line_number, COUNT(*) AS ocorrencias
+FROM public.log_events
+GROUP BY source_file, line_number
+HAVING COUNT(*) > 1;
+
 -- 1. Quantidade, cobertura das linhas e período.
 -- Esperado: total=2000; linhas_distintas=2000; primeira_linha=1;
 -- ultima_linha=2000; primeiro_evento=2016-09-28 04:30:30;
