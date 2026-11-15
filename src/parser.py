@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 from collections import Counter
 from datetime import datetime
+import csv
 
 
 LOG_PATH = Path(__file__).parent.parent / "data" / "raw" / "Windows_2k.log"
@@ -137,3 +138,69 @@ if duplicate_lines:
     print("\nExemplos de linhas repetidas:")
     for raw_line, count in list(duplicate_lines.items())[:5]:
         print(f"{count}x: {raw_line}")
+
+
+OUTPUT_PATH = (
+    Path(__file__).parent.parent
+    / "data"
+    / "processed"
+    / "windows_events_normalized.csv"
+)
+
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+fieldnames = [
+    "line_number",
+    "event_timestamp_raw",
+    "event_timestamp",
+    "level",
+    "component",
+    "message",
+    "raw_line",
+    "parse_status",
+]
+
+with OUTPUT_PATH.open(
+    mode="w",
+    encoding="utf-8",
+    newline=""
+) as csv_file:
+
+    writer = csv.DictWriter(
+        csv_file,
+        fieldnames=fieldnames
+    )
+
+    writer.writeheader()
+
+    for event in parsed_events:
+        export_event = event.copy()
+
+        export_event["event_timestamp"] = (
+            export_event["event_timestamp"].strftime(
+                timestamp_format
+            )
+        )
+
+        writer.writerow(export_event)
+
+print(f"\nArquivo processado criado em: {OUTPUT_PATH}")
+print(f"Eventos exportados: {len(parsed_events)}")
+
+with OUTPUT_PATH.open(mode="r", encoding="utf-8", newline="") as csv_file:
+    reader = csv.DictReader(csv_file)
+    exported_fieldnames = reader.fieldnames
+    exported_rows = sum(1 for _ in reader)
+
+if exported_fieldnames != fieldnames:
+    raise ValueError("As colunas do CSV não correspondem ao esquema esperado.")
+
+if exported_rows != len(parsed_events):
+    raise ValueError(
+        "A quantidade de linhas no CSV não corresponde aos eventos parseados."
+    )
+
+print("\nValidação da exportação concluída:")
+print(f"Colunas verificadas: {len(exported_fieldnames)}")
+print(f"Linhas de dados no CSV: {exported_rows}")
+print("Resultado: exportação íntegra.")
