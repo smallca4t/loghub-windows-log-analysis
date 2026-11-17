@@ -54,9 +54,9 @@ Ela extrai timestamp, nível, componente e mensagem, preservando o restante do t
 
 A reconciliação foi satisfeita: total de linhas lidas = eventos parseados + linhas não reconhecidas.
 
-## 7. Próxima etapa
+## 7. Validação após o parsing
 
-Validar a qualidade dos campos extraídos antes de normalizar ou persistir dados: frequências de level e component, mensagens vazias, intervalo temporal, validade real dos timestamps e ocorrência de linhas idênticas repetidas. Registros repetidos não devem ser removidos sem justificativa baseada no contexto do log.
+Foram conferidas as frequências de level e component, mensagens vazias, intervalo temporal, validade dos timestamps e ocorrência de linhas idênticas repetidas. Registros repetidos não foram removidos sem justificativa baseada no contexto do log.
 
 ## 8. Resultado da validação inicial
 
@@ -73,8 +73,27 @@ Validar a qualidade dos campos extraídos antes de normalizar ou persistir dados
 
 A estrutura extraída é coerente com o padrão observado. A presença da palavra `Warning` em algumas mensagens não altera o valor estruturado de `level`, que é `Info` em todos os registros.
 
-As repetições exatas não serão removidas nesta etapa: podem representar ocorrências legítimas do processo registrado. A deduplicação só poderá ser considerada posteriormente se houver uma pergunta analítica e uma justificativa documentada.
+As repetições exatas foram preservadas: podem representar ocorrências legítimas do processo registrado. Uma eventual deduplicação exige uma pergunta analítica e uma justificativa documentada.
 
-## 9. Próxima etapa revisada
+## 9. Normalização e carga
 
-Com a validação concluída, a próxima atividade é definir normalizações necessárias e seguras. O ponto de partida será converter `event_timestamp` de texto para datetime, preservando `raw_line` e os valores originais para rastreabilidade.
+`event_timestamp` foi convertido de texto para `datetime` durante o processamento, preservando o valor original e `raw_line`. O CSV foi carregado em `public.log_events`, no PostgreSQL, usando `TIMESTAMP WITHOUT TIME ZONE`, pois o fuso horário de origem não é conhecido.
+
+A combinação `(source_file, line_number)` identifica uma posição no arquivo para impedir uma segunda carga da mesma linha. O carregador compara o conteúdo existente antes de ignorar uma linha já presente e sinaliza conflitos. Na importação manual inicial, oito linhas (977 a 984) tiveram alterado o prefixo `\\?\GLOBALROOT` de um caminho Windows; elas foram reparadas no banco e verificadas contra o CSV. As consultas de integridade estão em `sql/validation.sql`; a correção pontual está em `sql/repairs/001_restore_unc_path_prefix.sql`.
+
+## 10. Análise exploratória iniciada
+
+### Caminho da investigação
+
+1. Partimos dos 2.000 eventos e contamos as ocorrências de cada `message` completo para identificar textos repetidos. `Warning: Unrecognized packageExtended attribute.` apareceu em 280 eventos. Essa contagem representa ocorrências do texto, não incidentes distintos.
+2. Ao examinar os resultados, percebemos que algumas mensagens não são idênticas, mas compartilham um trecho fixo. Selecionamos `Read out cached package applicability for package:` como uma família para investigar essa semelhança sem alterar as mensagens originais.
+3. Contamos todos os eventos dessa família e seus textos completos distintos. Depois, verificamos a frequência de cada texto para separar a ideia de família da ideia de repetição exata.
+4. A investigação está concentrada, neste momento, em **todas as ocorrências dessa família**. Foram observados formatos de nome de pacote como `Package_for_KB...`, `Microsoft-Windows-...`, `Microsoft-Hyper-V-...` e `Package_for_RollupFix...`; eles ainda não foram classificados nem quantificados como subgrupos.
+
+As consultas reproduzíveis desta etapa estão em [sql/analysis.sql](sql/analysis.sql).
+
+Uma segunda consulta selecionou mensagens que começam com `Read out cached package applicability for package:`. Foram encontradas 558 ocorrências e 280 mensagens completas diferentes. O prefixo define uma família exploratória; os 280 textos diferentes não devem ser interpretados automaticamente como 280 pacotes distintos.
+
+A consulta de frequência, ordenada da maior para a menor contagem, mostrou três mensagens com quatro ocorrências cada e, em seguida, mensagens com duas ocorrências. Combinando essa ordem com os totais da família, a distribuição é: 3 textos aparecem 4 vezes, 269 textos aparecem 2 vezes e 8 textos aparecem 1 vez (`3 × 4 + 269 × 2 + 8 × 1 = 558`). A repetição do texto não demonstra, por si só, duplicação indevida de eventos.
+
+Próximo exame: aprofundar a análise das 558 ocorrências, verificando os formatos de nome de pacote e os estados presentes nas mensagens. A investigação temporal e as demais perguntas definidas para o projeto ficam para depois desta análise.
