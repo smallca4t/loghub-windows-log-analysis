@@ -6,7 +6,7 @@
 - Origem declarada: LogHub, disponível no GitHub.
 - URL/origem específica: ainda não registrada.
 - Formato: .log (texto).
-- Tamanho: a confirmar pelas propriedades do arquivo.
+- Tamanho: 285.433 bytes (arquivo local `data/raw/Windows_2k.log`).
 - Total de linhas: 2.000.
 - Codificação usada na leitura: UTF-8; a leitura Python foi concluída sem erro de decodificação.
 
@@ -88,7 +88,7 @@ A combinação `(source_file, line_number)` identifica uma posição no arquivo 
 1. Partimos dos 2.000 eventos e contamos as ocorrências de cada `message` completo para identificar textos repetidos. `Warning: Unrecognized packageExtended attribute.` apareceu em 280 eventos. Essa contagem representa ocorrências do texto, não incidentes distintos.
 2. Ao examinar os resultados, percebemos que algumas mensagens não são idênticas, mas compartilham um trecho fixo. Selecionamos `Read out cached package applicability for package:` como uma família para investigar essa semelhança sem alterar as mensagens originais.
 3. Contamos todos os eventos dessa família e seus textos completos distintos. Depois, verificamos a frequência de cada texto para separar a ideia de família da ideia de repetição exata.
-4. A investigação está concentrada, neste momento, em **todas as ocorrências dessa família**. Foram observados formatos de nome de pacote como `Package_for_KB...`, `Microsoft-Windows-...`, `Microsoft-Hyper-V-...` e `Package_for_RollupFix...`; eles ainda não foram classificados nem quantificados como subgrupos.
+4. A investigação está concentrada, neste momento, em **todas as ocorrências dessa família**. Os eventos foram classificados provisoriamente pelo início do nome do pacote: `Package_for_KB...`, `Microsoft-Windows-...`, `Microsoft-Hyper-V-...` e `Package_for_RollupFix...`. Mensagens sem correspondência ficariam em `Outros` para revisão.
 
 As consultas reproduzíveis desta etapa estão em [sql/analysis.sql](sql/analysis.sql).
 
@@ -96,4 +96,28 @@ Uma segunda consulta selecionou mensagens que começam com `Read out cached pack
 
 A consulta de frequência, ordenada da maior para a menor contagem, mostrou três mensagens com quatro ocorrências cada e, em seguida, mensagens com duas ocorrências. Combinando essa ordem com os totais da família, a distribuição é: 3 textos aparecem 4 vezes, 269 textos aparecem 2 vezes e 8 textos aparecem 1 vez (`3 × 4 + 269 × 2 + 8 × 1 = 558`). A repetição do texto não demonstra, por si só, duplicação indevida de eventos.
 
-Próximo exame: aprofundar a análise das 558 ocorrências, verificando os formatos de nome de pacote e os estados presentes nas mensagens. A investigação temporal e as demais perguntas definidas para o projeto ficam para depois desta análise.
+Na tabela abaixo, **eventos** são linhas de log; **mensagens completas diferentes** são os textos distintos dessas linhas. Assim, 541 eventos em `Package_for_KB` contêm 271 textos diferentes, com 270 ocorrências além da primeira de cada texto.
+
+| Grupo provisório pelo prefixo do pacote | Eventos | Mensagens completas diferentes |
+| --- | ---: | ---: |
+| `Package_for_KB` | 541 | 271 |
+| `Microsoft-Hyper-V` | 8 | 4 |
+| `Microsoft-Windows` | 8 | 4 |
+| `Package_for_RollupFix` | 1 | 1 |
+| **Total** | **558** | **280** |
+
+Não houve eventos em `Outros`: os quatro prefixos cobrem a família selecionada neste arquivo. A predominância de `Package_for_KB` descreve esta amostra; a contagem de mensagens distintas não é uma contagem verificada de pacotes únicos.
+
+Os dois valores ao fim da mensagem foram extraídos em todos os 558 eventos da família; não houve linhas em `não extraído`. Os pares abaixo são os **valores registrados**, sem atribuir significado aos códigos numéricos:
+
+| `ApplicableState` | `CurrentState` | Eventos | Mensagens completas diferentes |
+| ---: | ---: | ---: | ---: |
+| 112 | 112 | 409 | 205 |
+| 80 | 112 | 81 | 41 |
+| 80 | 0 | 26 | 13 |
+| 0 | 0 | 22 | 11 |
+| 112 | 0 | 18 | 9 |
+| 64 | 0 | 2 | 1 |
+| **Total** | | **558** | **280** |
+
+Próximo exame: cruzar os pares de valores com os quatro subgrupos de nome de pacote para observar onde cada combinação aparece. A investigação temporal e as demais perguntas definidas para o projeto ficam para depois desta análise.

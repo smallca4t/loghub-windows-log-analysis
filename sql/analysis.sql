@@ -36,3 +36,69 @@ WHERE source_file = 'Windows_2k.log'
 GROUP BY message
 ORDER BY ocorrencias DESC, message
 LIMIT 20;
+
+-- 4. Subgrupos provisórios pelo início do nome do pacote.
+-- "Outros" preserva mensagens que não se encaixam nos quatro modelos.
+-- Resultado: Package_for_KB=541/271, Microsoft-Hyper-V=8/4,
+-- Microsoft-Windows=8/4, Package_for_RollupFix=1/1
+-- (eventos/mensagens diferentes). A soma é 558/280; Outros=0.
+WITH familia AS (
+    SELECT message
+    FROM public.log_events
+    WHERE source_file = 'Windows_2k.log'
+      AND message LIKE 'Read out cached package applicability for package:%'
+), classificados AS (
+    SELECT
+        message,
+        CASE
+            WHEN message LIKE 'Read out cached package applicability for package: Package_for_KB%'
+                THEN 'Package_for_KB'
+            WHEN message LIKE 'Read out cached package applicability for package: Package_for_RollupFix%'
+                THEN 'Package_for_RollupFix'
+            WHEN message LIKE 'Read out cached package applicability for package: Microsoft-Windows%'
+                THEN 'Microsoft-Windows'
+            WHEN message LIKE 'Read out cached package applicability for package: Microsoft-Hyper-V%'
+                THEN 'Microsoft-Hyper-V'
+            ELSE 'Outros'
+        END AS grupo
+    FROM familia
+)
+SELECT
+    grupo,
+    COUNT(*) AS eventos,
+    COUNT(DISTINCT message) AS mensagens_diferentes
+FROM classificados
+GROUP BY grupo
+ORDER BY eventos DESC, grupo;
+
+-- 5. Combinações de ApplicableState e CurrentState na mesma família.
+-- O padrão exige os dois números no fim da mensagem.
+-- "não extraído" sinaliza mensagens fora desse formato para revisão.
+-- Observado (par: eventos/mensagens diferentes): 112/112: 409/205;
+-- 80/112: 81/41; 80/0: 26/13; 0/0: 22/11;
+-- 112/0: 18/9; 64/0: 2/1. Totais: 558/280; não extraídos: 0.
+WITH familia AS (
+    SELECT
+        message,
+        regexp_match(
+            message,
+            'ApplicableState:[[:space:]]*([0-9]+),[[:space:]]*CurrentState:[[:space:]]*([0-9]+)[[:space:]]*$'
+        ) AS estados
+    FROM public.log_events
+    WHERE source_file = 'Windows_2k.log'
+      AND message LIKE 'Read out cached package applicability for package:%'
+), extraidos AS (
+    SELECT
+        message,
+        COALESCE(estados[1], 'não extraído') AS applicable_state,
+        COALESCE(estados[2], 'não extraído') AS current_state
+    FROM familia
+)
+SELECT
+    applicable_state,
+    current_state,
+    COUNT(*) AS eventos,
+    COUNT(DISTINCT message) AS mensagens_diferentes
+FROM extraidos
+GROUP BY applicable_state, current_state
+ORDER BY eventos DESC, applicable_state, current_state;
