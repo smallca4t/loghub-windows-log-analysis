@@ -120,4 +120,28 @@ Os dois valores ao fim da mensagem foram extraídos em todos os 558 eventos da f
 | 64 | 0 | 2 | 1 |
 | **Total** | | **558** | **280** |
 
-Próximo exame: cruzar os pares de valores com os quatro subgrupos de nome de pacote para observar onde cada combinação aparece. A investigação temporal e as demais perguntas definidas para o projeto ficam para depois desta análise.
+O cruzamento entre subgrupo de pacote e par de valores mostrou:
+
+| Grupo | `ApplicableState` | `CurrentState` | Eventos | Mensagens completas diferentes |
+| --- | ---: | ---: | ---: | ---: |
+| `Microsoft-Hyper-V` | 112 | 0 | 8 | 4 |
+| `Microsoft-Windows` | 112 | 112 | 6 | 3 |
+| `Microsoft-Windows` | 112 | 0 | 2 | 1 |
+| `Package_for_KB` | 112 | 112 | 402 | 201 |
+| `Package_for_KB` | 80 | 112 | 81 | 41 |
+| `Package_for_KB` | 80 | 0 | 26 | 13 |
+| `Package_for_KB` | 0 | 0 | 22 | 11 |
+| `Package_for_KB` | 112 | 0 | 8 | 4 |
+| `Package_for_KB` | 64 | 0 | 2 | 1 |
+| `Package_for_RollupFix` | 112 | 112 | 1 | 1 |
+| **Total** | | | **558** | **280** |
+
+Nesta amostra, `Microsoft-Hyper-V` aparece somente com `(112, 0)`; os pares `(80, 112)`, `(80, 0)`, `(0, 0)` e `(64, 0)` aparecem somente em `Package_for_KB`. Isso descreve a distribuição observada, sem interpretar o significado dos códigos nem uma possível mudança de estado de um pacote.
+
+### Fechamento da família analisada
+
+A extração do identificador completo de pacote e do par de valores cobriu os 558 eventos (`não extraídos = 0`). Foram encontrados **280 identificadores completos de pacote** e **280 mensagens completas diferentes**. A consulta por pacote não encontrou identificadores associados a mais de um par de valores. Portanto, **neste arquivo e com a versão incluída no identificador**, cada pacote distinto corresponde a um único texto completo e a um único par de valores; as demais ocorrências repetem esses textos em outros eventos.
+
+Isso não equivale a contar números de KB únicos sem considerar a versão, nem demonstra que os valores de um pacote nunca mudam fora desta amostra. Os códigos numéricos permanecem sem interpretação semântica nesta análise.
+
+A investigação desta família está concluída. As demais perguntas definidas para o projeto, incluindo a distribuição temporal e as mensagens com `Failed` ou `Warning`, serão analisadas em seguida.

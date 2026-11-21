@@ -102,3 +102,101 @@ SELECT
 FROM extraidos
 GROUP BY applicable_state, current_state
 ORDER BY eventos DESC, applicable_state, current_state;
+
+-- 6. Cruzamento: subgrupo do pacote x par de valores registrado.
+-- Cada evento entra em uma combinação; a soma de eventos deve ser 558.
+-- "Outros" e "não extraído" mantêm casos fora dos padrões visíveis.
+-- Resultado: 10 combinações; 558 eventos e 280 mensagens diferentes.
+-- Hyper-V: 112/0=8; Microsoft-Windows: 112/112=6, 112/0=2;
+-- KB: 112/112=402, 80/112=81, 80/0=26, 0/0=22,
+-- 112/0=8, 64/0=2; RollupFix: 112/112=1.
+WITH familia AS (
+    SELECT
+        message,
+        CASE
+            WHEN message LIKE 'Read out cached package applicability for package: Package_for_KB%'
+                THEN 'Package_for_KB'
+            WHEN message LIKE 'Read out cached package applicability for package: Package_for_RollupFix%'
+                THEN 'Package_for_RollupFix'
+            WHEN message LIKE 'Read out cached package applicability for package: Microsoft-Windows%'
+                THEN 'Microsoft-Windows'
+            WHEN message LIKE 'Read out cached package applicability for package: Microsoft-Hyper-V%'
+                THEN 'Microsoft-Hyper-V'
+            ELSE 'Outros'
+        END AS grupo,
+        regexp_match(
+            message,
+            'ApplicableState:[[:space:]]*([0-9]+),[[:space:]]*CurrentState:[[:space:]]*([0-9]+)[[:space:]]*$'
+        ) AS estados
+    FROM public.log_events
+    WHERE source_file = 'Windows_2k.log'
+      AND message LIKE 'Read out cached package applicability for package:%'
+), classificados AS (
+    SELECT
+        message,
+        grupo,
+        COALESCE(estados[1], 'não extraído') AS applicable_state,
+        COALESCE(estados[2], 'não extraído') AS current_state
+    FROM familia
+)
+SELECT
+    grupo,
+    applicable_state,
+    current_state,
+    COUNT(*) AS eventos,
+    COUNT(DISTINCT message) AS mensagens_diferentes
+FROM classificados
+GROUP BY grupo, applicable_state, current_state
+ORDER BY grupo, eventos DESC, applicable_state, current_state;
+
+-- 7a. Pacotes distintos: identificador completo, incluindo a versão.
+-- O trecho entre "package:" e ", ApplicableState:" é o identificador.
+-- Observado: eventos_familia=558, nao_extraidos=0,
+-- pacotes_distintos=280, mensagens_diferentes=280.
+WITH familia AS (
+    SELECT
+        message,
+        regexp_match(
+            message,
+            '^Read out cached package applicability for package:[[:space:]]*([^,]+),[[:space:]]*ApplicableState:[[:space:]]*([0-9]+),[[:space:]]*CurrentState:[[:space:]]*([0-9]+)[[:space:]]*$'
+        ) AS partes
+    FROM public.log_events
+    WHERE source_file = 'Windows_2k.log'
+      AND message LIKE 'Read out cached package applicability for package:%'
+)
+SELECT
+    COUNT(*) AS eventos_familia,
+    COUNT(*) FILTER (WHERE partes IS NULL) AS nao_extraidos,
+    COUNT(DISTINCT partes[1]) AS pacotes_distintos,
+    COUNT(DISTINCT message) AS mensagens_diferentes
+FROM familia;
+
+-- 7b. Pacotes que aparecem com mais de um par de valores.
+-- Uma linha por identificador completo; o mesmo par repetido não aumenta
+-- pares_diferentes. Se não houver resultados, nenhum pacote foi observado
+-- com mais de um par; a consulta não analisa transições temporais.
+-- Observado: nenhuma linha retornada neste arquivo.
+WITH familia AS (
+    SELECT
+        message,
+        regexp_match(
+            message,
+            '^Read out cached package applicability for package:[[:space:]]*([^,]+),[[:space:]]*ApplicableState:[[:space:]]*([0-9]+),[[:space:]]*CurrentState:[[:space:]]*([0-9]+)[[:space:]]*$'
+        ) AS partes
+    FROM public.log_events
+    WHERE source_file = 'Windows_2k.log'
+      AND message LIKE 'Read out cached package applicability for package:%'
+), por_pacote AS (
+    SELECT
+        partes[1] AS pacote,
+        COUNT(*) AS eventos,
+        COUNT(DISTINCT message) AS mensagens_diferentes,
+        COUNT(DISTINCT ROW(partes[2], partes[3])) AS pares_diferentes
+    FROM familia
+    WHERE partes IS NOT NULL
+    GROUP BY partes[1]
+)
+SELECT pacote, eventos, mensagens_diferentes, pares_diferentes
+FROM por_pacote
+WHERE pares_diferentes > 1
+ORDER BY pares_diferentes DESC, eventos DESC, pacote;
